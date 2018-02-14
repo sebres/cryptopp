@@ -3,6 +3,8 @@
 ###########################################################
 
 # https://www.gnu.org/software/make/manual/make.html#Makefile-Conventions
+# and https://www.gnu.org/prep/standards/standards.html
+
 SHELL = /bin/sh
 
 # If needed
@@ -10,7 +12,7 @@ TMPDIR ?= /tmp
 # Used for ARMv7 and NEON.
 FP_ABI ?= hard
 
-# Command ard arguments
+# Command and arguments
 AR ?= ar
 ARFLAGS ?= -cr # ar needs the dash on OpenBSD
 RANLIB ?= ranlib
@@ -19,9 +21,14 @@ CP ?= cp
 MV ?= mv
 RM ?= rm -f
 CHMOD ?= chmod
-MKDIR ?= mkdir
+MKDIR ?= mkdir -p
+
 LN ?= ln -sf
 LDCONF ?= /sbin/ldconfig -n
+
+INSTALL = install
+INSTALL_PROGRAM = $(INSTALL)
+INSTALL_DATA = $(INSTALL) -m 644
 
 # Solaris provides a non-Posix shell at /usr/bin
 ifneq ($(wildcard /usr/xpg4/bin),)
@@ -243,15 +250,11 @@ ifeq ($(findstring -DCRYPTOPP_DISABLE_SSSE3,$(CXXFLAGS)),)
   ifeq ($(HAVE_SSSE3),1)
     ARIA_FLAG = -mssse3
     SSSE3_FLAG = -mssse3
-    SIMON_FLAG = -mssse3
-    SPECK_FLAG = -mssse3
   endif
 ifeq ($(findstring -DCRYPTOPP_DISABLE_SSE4,$(CXXFLAGS)),)
   HAVE_SSE4 = $(shell echo | $(CXX) -x c++ $(CXXFLAGS) -msse4.1 -dM -E - 2>/dev/null | $(GREP) -i -c __SSE4_1__)
   ifeq ($(HAVE_SSE4),1)
     BLAKE2_FLAG = -msse4.1
-    SIMON_FLAG = -msse4.1
-    SPECK_FLAG = -msse4.1
   endif
   HAVE_SSE4 = $(shell echo | $(CXX) -x c++ $(CXXFLAGS) -msse4.2 -dM -E - 2>/dev/null | $(GREP) -i -c __SSE4_2__)
   ifeq ($(HAVE_SSE4),1)
@@ -282,15 +285,11 @@ ifeq ($(SUN_COMPILER),1)
   ifeq ($(COUNT),0)
     SSSE3_FLAG = -xarch=ssse3 -D__SSSE3__=1
     ARIA_FLAG = -xarch=ssse3 -D__SSSE3__=1
-    SIMON_FLAG = -xarch=ssse3 -D__SSSE3__=1
-    SPECK_FLAG = -xarch=ssse3 -D__SSSE3__=1
     LDFLAGS += -xarch=ssse3
   endif
   COUNT := $(shell $(CXX) $(CXXFLAGS) -E -xarch=sse4_1 -xdumpmacros /dev/null 2>&1 | $(GREP) -i -c "illegal")
   ifeq ($(COUNT),0)
     BLAKE2_FLAG = -xarch=sse4_1 -D__SSE4_1__=1
-    SIMON_FLAG = -xarch=sse4_1 -D__SSE4_1__=1
-    SPECK_FLAG = -xarch=sse4_1 -D__SSE4_1__=1
     LDFLAGS += -xarch=sse4_1
   endif
   COUNT := $(shell $(CXX) $(CXXFLAGS) -E -xarch=sse4_2 -xdumpmacros /dev/null 2>&1 | $(GREP) -i -c "illegal")
@@ -367,8 +366,6 @@ ifeq ($(IS_NEON),1)
     GCM_FLAG = -march=armv7-a -mfloat-abi=$(FP_ABI) -mfpu=neon
     ARIA_FLAG = -march=armv7-a -mfloat-abi=$(FP_ABI) -mfpu=neon
     BLAKE2_FLAG = -march=armv7-a -mfloat-abi=$(FP_ABI) -mfpu=neon
-    SIMON_FLAG = -march=armv7-a -mfloat-abi=$(FP_ABI) -mfpu=neon
-    SPECK_FLAG = -march=armv7-a -mfloat-abi=$(FP_ABI) -mfpu=neon
   endif
 endif
 
@@ -378,8 +375,6 @@ ifeq ($(IS_ARMV8),1)
     ARIA_FLAG = -march=armv8-a
     BLAKE2_FLAG = -march=armv8-a
     NEON_FLAG = -march=armv8-a
-    SIMON_FLAG = -march=armv8-a
-    SPECK_FLAG = -march=armv8-a
   endif
   HAVE_CRC = $(shell echo | $(CXX) -x c++ $(CXXFLAGS) -march=armv8-a+crc -dM -E - 2>/dev/null | $(GREP) -i -c __ARM_FEATURE_CRC32)
   ifeq ($(HAVE_CRC),1)
@@ -402,8 +397,6 @@ ifneq ($(IS_PPC32)$(IS_PPC64)$(IS_AIX),000)
     ALTIVEC_FLAG = -mcpu=power4 -maltivec
     ARIA_FLAG = -mcpu=power4 -maltivec
     BLAKE2_FLAG = -mcpu=power4 -maltivec
-    SIMON_FLAG = -mcpu=power4 -maltivec
-    SPECK_FLAG = -mcpu=power4 -maltivec
   endif
   # GCC and some compatibles
   HAVE_CRYPTO = $(shell echo | $(CXX) -x c++ $(CXXFLAGS) -mcpu=power8 -maltivec -dM -E - 2>/dev/null | $(GREP) -i -c -E '_ARCH_PWR8|_ARCH_PWR9|__CRYPTO')
@@ -412,8 +405,6 @@ ifneq ($(IS_PPC32)$(IS_PPC64)$(IS_AIX),000)
     AES_FLAG = -mcpu=power8 -maltivec
     GCM_FLAG = -mcpu=power8 -maltivec
     SHA_FLAG = -mcpu=power8 -maltivec
-    SIMON_FLAG = -mcpu=power8 -maltivec
-    SPECK_FLAG = -mcpu=power8 -maltivec
   endif
   # IBM XL C/C++
   HAVE_ALTIVEC = $(shell $(CXX) $(CXXFLAGS) -qshowmacros -qarch=pwr7 -qaltivec -E adhoc.cpp.proto 2>/dev/null | $(GREP) -i -c '__ALTIVEC__')
@@ -421,8 +412,6 @@ ifneq ($(IS_PPC32)$(IS_PPC64)$(IS_AIX),000)
     ALTIVEC_FLAG = -qarch=pwr7 -qaltivec
     ARIA_FLAG = -qarch=pwr7 -qaltivec
     BLAKE2_FLAG = -qarch=pwr7 -qaltivec
-    SIMON_FLAG = -qarch=pwr7 -qaltivec
-    SPECK_FLAG = -qarch=pwr7 -qaltivec
   endif
   # IBM XL C/C++
   HAVE_CRYPTO = $(shell $(CXX) $(CXXFLAGS) -qshowmacros -qarch=pwr8 -qaltivec -E adhoc.cpp.proto 2>/dev/null | $(GREP) -i -c -E '_ARCH_PWR8|_ARCH_PWR9|__CRYPTO')
@@ -433,8 +422,6 @@ ifneq ($(IS_PPC32)$(IS_PPC64)$(IS_AIX),000)
     SHA_FLAG = -qarch=pwr8 -qaltivec
     ARIA_FLAG = -qarch=pwr8 -qaltivec
     BLAKE2_FLAG = -qarch=pwr8 -qaltivec
-    SIMON_FLAG = -qarch=pwr8 -qaltivec
-    SPECK_FLAG = -qarch=pwr8 -qaltivec
   endif
 endif
 
@@ -827,7 +814,7 @@ clean:
 .PHONY: distclean
 distclean: clean
 	-$(RM) adhoc.cpp adhoc.cpp.copied GNUmakefile.deps benchmarks.html cryptest.txt cryptest-*.txt
-	@-$(RM) cryptopp.tgz *.o *.bc *.ii *~
+	@-$(RM) libcryptopp.pc cryptopp.tgz *.o *.bc *.ii *~
 	@-$(RM) -r $(SRCS:.cpp=.obj) cryptlib.lib cryptest.exe *.suo *.sdf *.pdb Win32/ x64/ ipch/
 	@-$(RM) -r $(DOCUMENT_DIRECTORY)/
 	@-$(RM) -f configure.ac configure configure.in Makefile.am Makefile.in Makefile
@@ -838,44 +825,40 @@ distclean: clean
 	@-$(RM) cryptopp$(LIB_VER)\.*
 	@-$(RM) CryptoPPRef.zip
 
+# Some users already have a libcryptopp.pc. We install it if the file
+# is present. If you want one, then issue 'make libcryptopp.pc'.
 .PHONY: install
 install:
-	@-$(MKDIR) -p $(DESTDIR)$(INCLUDEDIR)/cryptopp
-	$(CP) *.h $(DESTDIR)$(INCLUDEDIR)/cryptopp
-	-$(CHMOD) 0755 $(DESTDIR)$(INCLUDEDIR)/cryptopp
-	-$(CHMOD) 0644 $(DESTDIR)$(INCLUDEDIR)/cryptopp/*.h
+	@-$(MKDIR) $(DESTDIR)$(INCLUDEDIR)/cryptopp
+	$(INSTALL_DATA) *.h $(DESTDIR)$(INCLUDEDIR)/cryptopp
 ifneq ($(wildcard libcryptopp.a),)
-	@-$(MKDIR) -p $(DESTDIR)$(LIBDIR)
-	$(CP) libcryptopp.a $(DESTDIR)$(LIBDIR)
-	-$(CHMOD) 0644 $(DESTDIR)$(LIBDIR)/libcryptopp.a
+	@-$(MKDIR) $(DESTDIR)$(LIBDIR)
+	$(INSTALL_DATA) libcryptopp.a $(DESTDIR)$(LIBDIR)
 endif
 ifneq ($(wildcard cryptest.exe),)
-	@-$(MKDIR) -p $(DESTDIR)$(BINDIR)
-	$(CP) cryptest.exe $(DESTDIR)$(BINDIR)
-	-$(CHMOD) 0755 $(DESTDIR)$(BINDIR)/cryptest.exe
-	$(MKDIR) -p $(DESTDIR)$(DATADIR)/cryptopp
-	$(CP) -r TestData $(DESTDIR)$(DATADIR)/cryptopp
-	$(CP) -r TestVectors $(DESTDIR)$(DATADIR)/cryptopp
-	-$(CHMOD) 0755 $(DESTDIR)$(DATADIR)/cryptopp
-	-$(CHMOD) 0755 $(DESTDIR)$(DATADIR)/cryptopp/TestData
-	-$(CHMOD) 0755 $(DESTDIR)$(DATADIR)/cryptopp/TestVectors
-	-$(CHMOD) 0644 $(DESTDIR)$(DATADIR)/cryptopp/TestData/*.dat
-	-$(CHMOD) 0644 $(DESTDIR)$(DATADIR)/cryptopp/TestVectors/*.txt
+	@-$(MKDIR) $(DESTDIR)$(BINDIR)
+	$(INSTALL_PROGRAM) cryptest.exe $(DESTDIR)$(BINDIR)
+	@-$(MKDIR) $(DESTDIR)$(DATADIR)/cryptopp/TestData
+	@-$(MKDIR) $(DESTDIR)$(DATADIR)/cryptopp/TestVectors
+	$(INSTALL_DATA) TestData/*.dat $(DESTDIR)$(DATADIR)/cryptopp/TestData
+	$(INSTALL_DATA) TestVectors/*.txt $(DESTDIR)$(DATADIR)/cryptopp/TestVectors
 endif
 ifneq ($(wildcard libcryptopp.dylib),)
-	@-$(MKDIR) -p $(DESTDIR)$(LIBDIR)
-	$(CP) libcryptopp.dylib $(DESTDIR)$(LIBDIR)
+	@-$(MKDIR) $(DESTDIR)$(LIBDIR)
+	$(INSTALL_PROGRAM) libcryptopp.dylib $(DESTDIR)$(LIBDIR)
 	-install_name_tool -id $(DESTDIR)$(LIBDIR)/libcryptopp.dylib $(DESTDIR)$(LIBDIR)/libcryptopp.dylib
-	-$(CHMOD) 0755 $(DESTDIR)$(LIBDIR)/libcryptopp.dylib
 endif
 ifneq ($(wildcard libcryptopp.so$(SOLIB_VERSION_SUFFIX)),)
-	@-$(MKDIR) -p $(DESTDIR)$(LIBDIR)
-	$(CP) libcryptopp.so$(SOLIB_VERSION_SUFFIX) $(DESTDIR)$(LIBDIR)
-	@-$(CHMOD) 0755 $(DESTDIR)$(LIBDIR)/libcryptopp.so$(SOLIB_VERSION_SUFFIX)
+	@-$(MKDIR) $(DESTDIR)$(LIBDIR)
+	$(INSTALL_PROGRAM) libcryptopp.so$(SOLIB_VERSION_SUFFIX) $(DESTDIR)$(LIBDIR)
 ifeq ($(HAS_SOLIB_VERSION),1)
 	-$(LN) libcryptopp.so$(SOLIB_VERSION_SUFFIX) $(DESTDIR)$(LIBDIR)/libcryptopp.so
 	$(LDCONF) $(DESTDIR)$(LIBDIR)
 endif
+endif
+ifneq ($(wildcard libcryptopp.pc),)
+	@-$(MKDIR) $(DESTDIR)$(LIBDIR)/pkgconfig
+	$(INSTALL_DATA) libcryptopp.pc $(DESTDIR)$(LIBDIR)/pkgconfig/libcryptopp.pc
 endif
 
 .PHONY: remove uninstall
@@ -887,6 +870,7 @@ remove uninstall:
 	@-$(RM) $(DESTDIR)$(LIBDIR)/libcryptopp.so$(SOLIB_VERSION_SUFFIX)
 	@-$(RM) $(DESTDIR)$(LIBDIR)/libcryptopp.so$(SOLIB_COMPAT_SUFFIX)
 	@-$(RM) $(DESTDIR)$(LIBDIR)/libcryptopp.so
+	@-$(RM) $(DESTDIR)$(LIBDIR)/pkgconfig/libcryptopp.pc
 	@-$(RM) -r $(DESTDIR)$(DATADIR)/cryptopp
 
 libcryptopp.a: $(LIBOBJS)
@@ -938,6 +922,24 @@ cryptest.import.exe: cryptopp.dll libcryptopp.import.a $(TESTIMPORTOBJS)
 dlltest.exe: cryptopp.dll $(DLLTESTOBJS)
 	$(CXX) -o $@ $(strip $(CXXFLAGS)) $(DLLTESTOBJS) -L. -lcryptopp.dll $(LDFLAGS) $(LDLIBS)
 
+# Some users already have a libcryptopp.pc. We install it if the file
+# is present. If you want one, then issue 'make libcryptopp.pc'. Be sure
+# to use/verify PREFIX and LIBDIR below after writing the file.
+libcryptopp.pc:
+	@echo '# Crypto++ package configuration file' > libcryptopp.pc
+	@echo '' >> libcryptopp.pc
+	@echo 'prefix=$(PREFIX)' >> libcryptopp.pc
+	@echo 'libdir=$(LIBDIR)' >> libcryptopp.pc
+	@echo 'includedir=$${prefix}/include' >> libcryptopp.pc
+	@echo '' >> libcryptopp.pc
+	@echo 'Name: Crypto++' >> libcryptopp.pc
+	@echo 'Description: Crypto++ cryptographic library' >> libcryptopp.pc
+	@echo 'Version: 6.1.0' >> libcryptopp.pc
+	@echo 'URL: https://cryptopp.com/' >> libcryptopp.pc
+	@echo '' >> libcryptopp.pc
+	@echo 'Cflags: -I$${includedir}' >> libcryptopp.pc
+	@echo 'Libs: -L$${libdir} -lcryptopp' >> libcryptopp.pc
+
 # This recipe prepares the distro files
 TEXT_FILES := *.h *.cpp adhoc.cpp.proto License.txt Readme.txt Install.txt Filelist.txt Doxyfile cryptest* cryptlib* dlltest* cryptdll* *.sln *.vcxproj *.filters cryptopp.rc TestVectors/*.txt TestData/*.dat TestScripts/*.sh TestScripts/*.cmd
 EXEC_FILES := GNUmakefile GNUmakefile-cross TestData/ TestVectors/ TestScripts/
@@ -979,12 +981,12 @@ zip dist: | distclean convert
 .PHONY: iso
 iso: | zip
 ifneq ($(IS_DARWIN),0)
-	$(MKDIR) -p $(PWD)/cryptopp$(LIB_VER)
+	$(MKDIR) $(PWD)/cryptopp$(LIB_VER)
 	$(CP) cryptopp$(LIB_VER).zip $(PWD)/cryptopp$(LIB_VER)
 	hdiutil makehybrid -iso -joliet -o cryptopp$(LIB_VER).iso $(PWD)/cryptopp$(LIB_VER)
 	@-$(RM) -r $(PWD)/cryptopp$(LIB_VER)
 else ifneq ($(IS_LINUX),0)
-	$(MKDIR) -p $(PWD)/cryptopp$(LIB_VER)
+	$(MKDIR) $(PWD)/cryptopp$(LIB_VER)
 	$(CP) cryptopp$(LIB_VER).zip $(PWD)/cryptopp$(LIB_VER)
 	genisoimage -q -o cryptopp$(LIB_VER).iso $(PWD)/cryptopp$(LIB_VER)
 	@-$(RM) -r $(PWD)/cryptopp$(LIB_VER)
@@ -1008,14 +1010,6 @@ endif
 ifeq ($(wildcard GNUmakefile.deps),GNUmakefile.deps)
 -include GNUmakefile.deps
 endif # Dependencies
-
-# Run rdrand-nasm.sh to create the object files
-ifeq ($(USE_NASM),1)
-rdrand.o: rdrand.h rdrand.cpp rdrand.s
-	$(CXX) $(strip $(CXXFLAGS) -DNASM_RDRAND_ASM_AVAILABLE=1 -DNASM_RDSEED_ASM_AVAILABLE=1 -c rdrand.cpp)
-rdrand-%.o:
-	./rdrand-nasm.sh
-endif
 
 # IBM XLC -O3 optimization bug
 ifeq ($(XLC_COMPILER),1)
@@ -1062,14 +1056,6 @@ sha-simd.o : sha-simd.cpp
 # SSE4.2/SHA-NI or ARMv8a available
 shacal2-simd.o : shacal2-simd.cpp
 	$(CXX) $(strip $(CXXFLAGS) $(SHA_FLAG) -c) $<
-
-# SSSE3 or NEON available
-simon-simd.o : simon-simd.cpp
-	$(CXX) $(strip $(CXXFLAGS) $(SIMON_FLAG) -c) $<
-
-# SSSE3 or NEON available
-speck-simd.o : speck-simd.cpp
-	$(CXX) $(strip $(CXXFLAGS) $(SPECK_FLAG) -c) $<
 
 # Don't build Rijndael with UBsan. Too much noise due to unaligned data accesses.
 ifneq ($(findstring -fsanitize=undefined,$(CXXFLAGS)),)
