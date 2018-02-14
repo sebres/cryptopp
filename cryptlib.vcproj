@@ -8235,14 +8235,6 @@
 				</FileConfiguration>
 			</File>
 			<File
-				RelativePath="simon-simd.cpp"
-				>
-			</File>
-			<File
-				RelativePath="simon.cpp"
-				>
-			</File>
-			<File
 				RelativePath="simple.cpp"
 				>
 				<FileConfiguration
@@ -8498,14 +8490,6 @@
 			</File>
 			<File
 				RelativePath="sosemanuk.cpp"
-				>
-			</File>
-			<File
-				RelativePath="speck-simd.cpp"
-				>
-			</File>
-			<File
-				RelativePath="speck.cpp"
 				>
 			</File>
 			<File
@@ -10718,10 +10702,6 @@
 				>
 			</File>
 			<File
-				RelativePath="simon.h"
-				>
-			</File>
-			<File
 				RelativePath="simple.h"
 				>
 			</File>
@@ -10751,10 +10731,6 @@
 			</File>
 			<File
 				RelativePath="sosemanuk.h"
-				>
-			</File>
-			<File
-				RelativePath="speck.h"
 				>
 			</File>
 			<File
